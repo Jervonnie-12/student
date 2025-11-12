@@ -1,36 +1,42 @@
 // ==============================
-// Simple Student CRUD (One File)
+// Simple Student CRUD (Vercel Compatible)
 // Node.js + Express + MongoDB Atlas
 // ==============================
 
+// Load environment variables from .env file
 require('dotenv').config();
+
+// Import dependencies
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 
+// Create Express app
 const app = express();
-const PORT = process.env.PORT || 3000;
 
 // ====== Middleware ======
 app.use(cors());
 app.use(express.json());
 
 // ====== Mongoose Schema & Model ======
-const studentSchema = new mongoose.Schema({
-  firstName: { type: String, required: true },
-  lastName: { type: String, required: true },
-  email: { type: String, required: true, unique: true },
-  course: String,
-  year: Number
-}, { timestamps: true });
+const studentSchema = new mongoose.Schema(
+  {
+    firstName: { type: String, required: true },
+    lastName: { type: String, required: true },
+    email: { type: String, required: true, unique: true },
+    course: String,
+    year: Number
+  },
+  { timestamps: true }
+);
 
 const Student = mongoose.model('Student', studentSchema);
 
 // ====== Routes ======
 
-// Root
+// Root route (for quick test)
 app.get('/', (req, res) => {
-  res.send('✅ Student CRUD API is running!');
+  res.send('✅ Student CRUD API is running on Vercel!');
 });
 
 // Create a student
@@ -65,7 +71,7 @@ app.get('/students/:id', async (req, res) => {
   }
 });
 
-// Update student
+// Update a student
 app.put('/students/:id', async (req, res) => {
   try {
     const student = await Student.findByIdAndUpdate(req.params.id, req.body, { new: true });
@@ -76,26 +82,30 @@ app.put('/students/:id', async (req, res) => {
   }
 });
 
-// Delete student
+// Delete a student
 app.delete('/students/:id', async (req, res) => {
   try {
     const student = await Student.findByIdAndDelete(req.params.id);
     if (!student) return res.status(404).json({ message: 'Student not found' });
-    res.json({ message: 'Student deleted' });
+    res.json({ message: 'Student deleted successfully' });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
 // ====== Connect to MongoDB Atlas ======
-async function startServer() {
+async function connectDB() {
+  if (mongoose.connection.readyState >= 1) return;
+
   try {
     await mongoose.connect(process.env.MONGODB_URI);
     console.log('✅ Connected to MongoDB Atlas');
-    app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
   } catch (err) {
-    console.error('❌ Failed to connect:', err.message);
+    console.error('❌ MongoDB connection failed:', err.message);
   }
 }
-//hello
-startServer();
+
+connectDB();
+
+// ====== Export app for Vercel ======
+module.exports = app;
