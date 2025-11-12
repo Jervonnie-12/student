@@ -1,60 +1,57 @@
 // ==============================
-// Simple Student CRUD (Vercel Compatible)
-// Node.js + Express + MongoDB Atlas
+// Simple Student CRUD (Vercel + MongoDB Data API)
 // ==============================
 
-// Load environment variables from .env file
+// Load environment variables
 require('dotenv').config();
-
-// Import dependencies
 const express = require('express');
-const mongoose = require('mongoose');
 const cors = require('cors');
+const fetch = require('node-fetch');
 
-// Create Express app
 const app = express();
-
-// ====== Middleware ======
 app.use(cors());
 app.use(express.json());
 
-// ====== Mongoose Schema & Model ======
-const studentSchema = new mongoose.Schema(
-  {
-    firstName: { type: String, required: true },
-    lastName: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
-    course: String,
-    year: Number
-  },
-  { timestamps: true }
-);
-
-const Student = mongoose.model('Student', studentSchema);
+// ====== Helper Function ======
+async function callDataAPI(action, body) {
+  const response = await fetch(`${process.env.DATA_API_URL}/action/${action}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'api-key': process.env.DATA_API_KEY,
+    },
+    body: JSON.stringify({
+      dataSource: process.env.DATA_API_DATASOURCE, // usually "Cluster0"
+      database: process.env.DATA_API_DATABASE,     // your DB name
+      collection: process.env.DATA_API_COLLECTION, // "students"
+      ...body,
+    }),
+  });
+  return response.json();
+}
 
 // ====== Routes ======
 
-// Root route (for quick test)
+// Root route
 app.get('/', (req, res) => {
-  res.send('✅ Student CRUD API is running!');
+  res.send('✅ Student CRUD API (MongoDB Data API version) is running!');
 });
 
-// Create a student
+// Create student
 app.post('/students', async (req, res) => {
   try {
-    const student = new Student(req.body);
-    await student.save();
-    res.status(201).json(student);
+    const result = await callDataAPI('insertOne', { document: req.body });
+    res.status(201).json(result);
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    res.status(500).json({ message: err.message });
   }
 });
 
 // Read all students
 app.get('/students', async (req, res) => {
   try {
-    const students = await Student.find().sort({ createdAt: -1 });
-    res.json(students);
+    const result = await callDataAPI('find', { sort: { createdAt: -1 } });
+    res.json(result.documents || []);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -63,57 +60,40 @@ app.get('/students', async (req, res) => {
 // Read one student
 app.get('/students/:id', async (req, res) => {
   try {
-    const student = await Student.findById(req.params.id);
-    if (!student) return res.status(404).json({ message: 'Student not found' });
-    res.json(student);
+    const result = await callDataAPI('findOne', {
+      filter: { _id: { $oid: req.params.id } },
+    });
+    if (!result.document) return res.status(404).json({ message: 'Student not found' });
+    res.json(result.document);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-// Update a student
+// Update student
 app.put('/students/:id', async (req, res) => {
   try {
-    const student = await Student.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!student) return res.status(404).json({ message: 'Student not found' });
-    res.json(student);
-  } catch (err) {
-    res.status(400).json({ message: err.message });
-  }
-});
-
-// Delete a student
-app.delete('/students/:id', async (req, res) => {
-  try {
-    const student = await Student.findByIdAndDelete(req.params.id);
-    if (!student) return res.status(404).json({ message: 'Student not found' });
-    res.json({ message: 'Student deleted successfully' });
+    const result = await callDataAPI('updateOne', {
+      filter: { _id: { $oid: req.params.id } },
+      update: { $set: req.body },
+    });
+    res.json(result);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-// ====== Connect to MongoDB Atlas ======
-async function connectDB() {
-  if (mongoose.connection.readyState >= 1) return;
-
+// Delete student
+app.delete('/students/:id', async (req, res) => {
   try {
-    await mongoose.connect(process.env.MONGODB_URI);
-    console.log('✅ Connected to MongoDB Atlas');
+    const result = await callDataAPI('deleteOne', {
+      filter: { _id: { $oid: req.params.id } },
+    });
+    res.json(result);
   } catch (err) {
-    console.error('❌ MongoDB connection failed:', err.message);
+    res.status(500).json({ message: err.message });
   }
-}
+});
 
-connectDB();
-
-// ====== Local Development: Start Server ======
-if (require.main === module) {
-  const PORT = process.env.PORT || 3000;
-  app.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
-  });
-}
-
-// ====== Export app for Vercel ======
+// ====== Export for Vercel ======
 module.exports = app;
