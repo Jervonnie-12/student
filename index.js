@@ -36,7 +36,7 @@ const Student = mongoose.model('Student', studentSchema);
 
 // Root route (for quick test)
 app.get('/', (req, res) => {
-  res.send('✅ Student CRUD API is running on Vercel!');
+  res.send('✅ Student CRUD API is running!');
 });
 
 // Create a student
@@ -106,6 +106,14 @@ async function connectDB() {
 }
 
 connectDB();
+
+// ====== Local Development: Start Server ======
+if (require.main === module) {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+  });
+}
 
 // ====== Export app for Vercel ======
 module.exports = app;
